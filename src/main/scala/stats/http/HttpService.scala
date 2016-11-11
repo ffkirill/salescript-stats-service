@@ -7,18 +7,27 @@ import akka.http.scaladsl.model.ws.Message
 
 import scala.concurrent.ExecutionContext
 
-class HttpService(wsMessagesProcessorFactory: (String => Flow[Message, Message, NotUsed]))
+
+object HttpServiceTypes {
+  type WsMessagesProcessorFactoryT = (String, Int) => Flow[Message, Message, NotUsed]
+}
+
+
+class HttpService(wsMessagesProcessorFactory: HttpServiceTypes.WsMessagesProcessorFactoryT)
                  (implicit executionContext: ExecutionContext) {
   val route =
     path("collect") {
       get {
-        cookie("sessionid") { pair => handleWebSocketMessages(wsMessagesProcessorFactory(pair.value)) }
+        parameter("scriptId".as[Int]) {
+          scriptId => cookie("sessionid") {
+            pair => handleWebSocketMessages(wsMessagesProcessorFactory(pair.value, scriptId)) }
+        }
       }
     }
 }
 
 object HttpService {
-  def apply(wsMessagesProcessorFactory: (String => Flow[Message, Message, NotUsed]))
+  def apply(wsMessagesProcessorFactory: HttpServiceTypes.WsMessagesProcessorFactoryT)
            (implicit executionContext: ExecutionContext): HttpService =
     new HttpService(wsMessagesProcessorFactory)(executionContext)
 }
