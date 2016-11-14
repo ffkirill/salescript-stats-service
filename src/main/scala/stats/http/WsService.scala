@@ -8,6 +8,7 @@ import akka.stream.{ActorMaterializer, OverflowStrategy}
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import spray.json._
 import spray.json.DefaultJsonProtocol
+import stats.services.EventsService
 import stats.{NoSuchEvent, ScriptPlayerEvent, ScriptPlayerEventsSource}
 
 import scala.concurrent.ExecutionContext
@@ -21,8 +22,9 @@ class WsService()(implicit val system: ActorSystem,
                   fm: ActorMaterializer,
                   ec: ExecutionContext) extends Protocols {
 
-  def createProcessor(sessionId: String, scriptId: Int): Flow[Message, Message, NotUsed] = {
-    val collectingActor = system.actorOf(Props(new ScriptPlayerEventsSource))
+  def createProcessor(eventsService: EventsService)
+                     (sessionId: String, scriptId: Int): Flow[Message, Message, NotUsed] = {
+    val collectingActor = system.actorOf(ScriptPlayerEventsSource.props(eventsService))
 
     External.fetchUserCredential(sessionId).foreach({
       case Right(user) => collectingActor ! ScriptPlayerEventsSource.Authorized(scriptId, user.id)

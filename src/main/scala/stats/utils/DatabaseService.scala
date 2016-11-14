@@ -15,3 +15,8 @@ class DatabaseService(jdbcUrl: String, dbUser: String, dbPassword: String) {
   val db = Database.forDataSource(dataSource)
   db.createSession()
 }
+
+object DatabaseService {
+  def apply(jdbcUrl: String, dbUser: String, dbPassword: String): DatabaseService =
+    new DatabaseService(jdbcUrl, dbUser, dbPassword)
+}

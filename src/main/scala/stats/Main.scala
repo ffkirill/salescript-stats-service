@@ -8,7 +8,8 @@ import akka.stream.ActorMaterializer
 import scala.concurrent.ExecutionContext
 import http.HttpService
 import http.WsService
-import stats.utils.{Config, FlywayService}
+import stats.utils.{Config, FlywayService, DatabaseService}
+import stats.services.EventsService
 
 object Main extends App with Config {
   implicit val actorSystem = ActorSystem()
@@ -19,7 +20,11 @@ object Main extends App with Config {
   val flywayService = FlywayService(jdbcUrl, dbUser, dbPassword)
   flywayService.migrateDatabaseSchema()
 
+  val dbService = DatabaseService(jdbcUrl, dbUser, dbPassword)
+  val eventsService = EventsService(dbService)
+
   val wsService = WsService()
-  val httpService = HttpService(wsService.createProcessor)
+  val httpService = HttpService(wsService.createProcessor(eventsService))
   Http().bindAndHandle(httpService.route, httpHost, httpPort)
+
 }

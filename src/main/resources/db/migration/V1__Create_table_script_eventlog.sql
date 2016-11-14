@@ -5,5 +5,5 @@ CREATE TABLE "script_eventlog" (
   "from_node" UUID NOT NULL,
   "to_node" UUID NOT NULL,
   "reached_goal" SMALLINT DEFAULT NULL,
-  "timestamp" TIMESTAMP NOT NULL DEFAULT NOW()
+  "timestamp" TIMESTAMP NOT NULL DEFAULT current_timestamp
 );
