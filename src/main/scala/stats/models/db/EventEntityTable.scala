@@ -16,8 +16,8 @@ trait EventEntityTable {
     def userId = column[Long]("user_id")
     def scriptId = column[Long]("script_id")
     def fromNodeId = column[UUID]("from_node")
-    def toNodeId = column[UUID]("to_node")
-    def reachedGoalId = column[Option[Int]]("reached_goal")
+    def toNodeId = column[Option[UUID]]("to_node")
+    def reachedGoalId = column[Option[Long]]("reached_goal")
     def timestamp = column[Timestamp]("timestamp", O.SqlType("timestamp default current_timestamp"))
 
     def * = (

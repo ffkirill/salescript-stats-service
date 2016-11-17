@@ -31,7 +31,7 @@ object External extends BackendApiProtocols with Config {
                           fm: ActorMaterializer,
                           ec: ExecutionContext): Future[Either[String, UserCredential]] = {
     Http().singleRequest(
-      RequestBuilding.Get("http://127.0.0.1:8000/api/current_user")
+      RequestBuilding.Get(s"$backendApiEndpoint/api/current_user")
         .addHeader(Cookie("sessionid" -> sessionId))
         .withEntity(ContentTypes.`application/json`, "")) flatMap { response =>
       response.status match {

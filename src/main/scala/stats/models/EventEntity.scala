@@ -7,7 +7,7 @@ case class EventEntity(id: Option[Long] = None,
                        userId: Long,
                        scriptId: Long,
                        fromNodeId: UUID,
-                       toNodeId: UUID,
-                       reachedGoalId: Option[Int],
+                       toNodeId: Option[UUID] = None,
+                       reachedGoalId: Option[Long] = None,
                        timestamp: Timestamp) {
 }
