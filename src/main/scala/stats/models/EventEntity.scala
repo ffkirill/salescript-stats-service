@@ -9,5 +9,7 @@ case class EventEntity(id: Option[Long] = None,
                        fromNodeId: UUID,
                        toNodeId: Option[UUID] = None,
                        reachedGoalId: Option[Long] = None,
+                       textFrom: Option[String] = None,
+                       textTo: Option[String] = None,
                        timestamp: Timestamp) {
 }

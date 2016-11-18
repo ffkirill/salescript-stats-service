@@ -14,7 +14,7 @@ import stats.{NoSuchEvent, ScriptPlayerEvent, ScriptPlayerEventsSource}
 import scala.concurrent.ExecutionContext
 
 trait Protocols extends DefaultJsonProtocol {
-  implicit val nodeReachedFormat = jsonFormat2(ScriptPlayerEventsSource.NodeReached.apply)
+  implicit val nodeReachedFormat = jsonFormat4(ScriptPlayerEventsSource.NodeReached.apply)
 }
 
 

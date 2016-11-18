@@ -18,6 +18,8 @@ trait EventEntityTable {
     def fromNodeId = column[UUID]("from_node")
     def toNodeId = column[Option[UUID]]("to_node")
     def reachedGoalId = column[Option[Long]]("reached_goal")
+    def textFrom = column[Option[String]]("text_from")
+    def textTo = column[Option[String]]("text_to")
     def timestamp = column[Timestamp]("timestamp", O.SqlType("timestamp default current_timestamp"))
 
     def * = (
@@ -27,6 +29,8 @@ trait EventEntityTable {
       fromNodeId,
       toNodeId,
       reachedGoalId,
+      textFrom,
+      textTo,
       timestamp) <> ((EventEntity.apply _).tupled, EventEntity.unapply)
   }
 
