@@ -12,7 +12,7 @@ class DatabaseService(jdbcUrl: String, dbUser: String, dbPassword: String) {
 
   val driver = slick.driver.PostgresDriver
   import driver.api._
-  val db = Database.forDataSource(dataSource)
+  val db: driver.backend.DatabaseDef = Database.forDataSource(dataSource)
   db.createSession()
 }
 

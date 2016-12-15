@@ -9,6 +9,8 @@ class FlywayService(jdbcUrl: String, dbUser: String, dbPassword: String) {
 
   def migrateDatabaseSchema() : Unit = flyway.migrate()
 
+  def repair() : Unit = flyway.repair()
+
   def dropDatabase() : Unit = flyway.clean()
 }
 

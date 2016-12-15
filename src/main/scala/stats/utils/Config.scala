@@ -8,12 +8,12 @@ trait Config {
   private val httpConfig = config.getConfig("http")
   private val databaseConfig = config.getConfig("database")
 
-  val httpHost = httpConfig.getString("interface")
-  val httpPort = httpConfig.getInt("port")
+  val httpHost: String = httpConfig.getString("interface")
+  val httpPort: Int = httpConfig.getInt("port")
 
-  val jdbcUrl = databaseConfig.getString("url")
-  val dbUser = databaseConfig.getString("user")
-  val dbPassword = databaseConfig.getString("password")
+  val jdbcUrl: String = databaseConfig.getString("url")
+  val dbUser: String = databaseConfig.getString("user")
+  val dbPassword: String = databaseConfig.getString("password")
 
-  val backendApiEndpoint = backendConfig.getString("apiEndpoint")
+  val backendApiEndpoint: String = backendConfig.getString("apiEndpoint")
 }

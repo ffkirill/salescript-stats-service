@@ -8,41 +8,40 @@ import akka.stream.{ActorMaterializer, OverflowStrategy}
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import spray.json._
 import spray.json.DefaultJsonProtocol
-import stats.services.EventsService
-import stats.{NoSuchEvent, ScriptPlayerEvent, ScriptPlayerEventsSource}
+import stats.ScriptPlayerEventsRecorder.NodeReached
+import stats.models.User
+import stats.services.EventsDBService
+import stats.{NoSuchEvent, ScriptPlayerEvent, ScriptPlayerEventsRecorder}
 
 import scala.concurrent.ExecutionContext
 
 trait Protocols extends DefaultJsonProtocol {
-  implicit val nodeReachedFormat = jsonFormat4(ScriptPlayerEventsSource.NodeReached.apply)
+  implicit val nodeReachedFormat: RootJsonFormat[NodeReached] =
+    jsonFormat4(ScriptPlayerEventsRecorder.NodeReached.apply)
 }
 
 
 class WsService()(implicit val system: ActorSystem,
                   fm: ActorMaterializer,
+                  eventsService: EventsDBService,
                   ec: ExecutionContext) extends Protocols {
 
-  def createProcessor(eventsService: EventsService)
-                     (sessionId: String, scriptId: Int): Flow[Message, Message, NotUsed] = {
-    val collectingActor = system.actorOf(ScriptPlayerEventsSource.props(eventsService))
-
-    External.fetchUserCredential(sessionId).foreach({
-      case Right(user) => collectingActor ! ScriptPlayerEventsSource.Authorized(scriptId, user.id)
-      case Left(s) => println(s"Error: $s")
-    })
+  def createProcessor(user: User, scriptId: Long): Flow[Message, Message, NotUsed] = {
+    val collectingActor = system.actorOf(ScriptPlayerEventsRecorder.props(user, scriptId))
 
     val incomingMessages: Sink[Message, NotUsed] =
       Flow[Message].map {
         // transform websocket message to domain message
-        case TextMessage.Strict(text) => text.parseJson.convertTo[ScriptPlayerEventsSource.NodeReached]
+        case TextMessage.Strict(text) => text.parseJson.convertTo[ScriptPlayerEventsRecorder.NodeReached]
         case _ => NoSuchEvent
       }.to(Sink.actorRef[ScriptPlayerEvent](collectingActor, PoisonPill))
 
     val outgoingMessages: Source[Message, NotUsed] =
-      Source.actorRef[String](10, OverflowStrategy.fail).mapMaterializedValue(
-        outActor => NotUsed
-      ).map(TextMessage(_))
+      Source.actorRef[String](10, OverflowStrategy.fail)
+        .mapMaterializedValue(_ => NotUsed)
+        .map(TextMessage(_))
     // then combine both to a flow
+
     Flow.fromSinkAndSource(incomingMessages, outgoingMessages)
   }
 
@@ -51,5 +50,6 @@ class WsService()(implicit val system: ActorSystem,
 object WsService {
   def apply()(implicit system: ActorSystem,
               fm: ActorMaterializer,
-              ec: ExecutionContext) = new WsService()(system, fm, ec)
+              eventsService: EventsDBService,
+              ec: ExecutionContext) = new WsService()(system, fm, eventsService, ec)
 }
