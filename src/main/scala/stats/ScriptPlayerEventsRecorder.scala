@@ -3,9 +3,9 @@ package stats
 import java.sql.Timestamp
 import java.util.UUID
 
+import scala.util.Try
 import akka.actor.{Actor, Props}
-
-import stats.models.{EventEntity, User}
+import stats.models.{EventEntity, ScriptGoals, User}
 import stats.services.EventsDBService
 
 import scala.concurrent.ExecutionContext
@@ -19,6 +19,8 @@ object ScriptPlayerEventsRecorder {
 
   val success = "__success__"
   val fail = "__fail__"
+  val noSuchReply = "_no_such_event"
+  val entry = "__entry__"
 
   def props(user: User, scriptId: Long)
            (implicit ec:ExecutionContext, eventsService: EventsDBService) =
@@ -26,39 +28,36 @@ object ScriptPlayerEventsRecorder {
 }
 
 class ScriptPlayerEventsRecorder(user: User, scriptId: Long)
-                                (implicit ec: ExecutionContext, eventsService: EventsDBService) extends Actor {
+                                (implicit ec: ExecutionContext,
+                                 eventsService: EventsDBService) extends Actor {
+
+  def wrapText(s: String): Option[String] = if (s.isEmpty) None else Some(s)
 
   def receive: PartialFunction[Any, Unit] = {
     case ScriptPlayerEventsRecorder.NodeReached(from, to, textFrom, textTo) =>
-      to match {
-        case ScriptPlayerEventsRecorder.success =>
-          eventsService.createEvent(EventEntity(
-            userId = user.id,
-            scriptId = scriptId,
-            fromNodeId = UUID.fromString(from),
-            reachedGoalId = Some(0), // Success !TODO: refactor
-            textFrom = Some(textFrom),
-            timestamp = new Timestamp(System.currentTimeMillis())
-          ))
-        case ScriptPlayerEventsRecorder.fail =>
-          eventsService.createEvent(EventEntity(
-            userId = user.id,
-            scriptId = scriptId,
-            fromNodeId = UUID.fromString(from),
-            reachedGoalId = Some(1), // Success !TODO: refactor
-            textFrom = Some(textFrom),
-            timestamp = new Timestamp(System.currentTimeMillis())
-          ))
-        case _ =>
-          eventsService.createEvent(EventEntity(
-            userId = user.id,
-            scriptId = scriptId,
-            fromNodeId = UUID.fromString(from),
-            toNodeId = Some(UUID.fromString(to)),
-            textFrom = Some(textFrom),
-            textTo = Some(textTo),
-            timestamp = new Timestamp(System.currentTimeMillis())
-        ))
-      }
+      val fromUUID = Try(UUID.fromString(from)).toOption
+      val toUUID = Try(UUID.fromString(to)).toOption
+
+      eventsService.createEvent(EventEntity(
+        userId = user.id,
+        scriptId = scriptId,
+        fromNodeId = fromUUID,
+        toNodeId = toUUID,
+        textFrom = wrapText(textFrom),
+        textTo = wrapText(textTo),
+        timestamp = new Timestamp(System.currentTimeMillis()),
+        reachedGoalId = (from, to) match {
+          case (ScriptPlayerEventsRecorder.entry, _) =>
+            Some(ScriptGoals.scriptRan.id)
+          case (_, ScriptPlayerEventsRecorder.success) =>
+            Some(ScriptGoals.success.id)
+          case (_, ScriptPlayerEventsRecorder.fail) =>
+            Some(ScriptGoals.failure.id)
+          case (_, ScriptPlayerEventsRecorder.noSuchReply) =>
+            Some(ScriptGoals.noSuchReply.id)
+          case _ =>
+            None
+        }
+      ))
   }
 }

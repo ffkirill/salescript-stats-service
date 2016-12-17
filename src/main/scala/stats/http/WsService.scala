@@ -6,25 +6,21 @@ import akka.actor.{PoisonPill, Props}
 import akka.http.scaladsl.model.ws.{Message, TextMessage}
 import akka.stream.{ActorMaterializer, OverflowStrategy}
 import akka.stream.scaladsl.{Flow, Sink, Source}
-import spray.json._
-import spray.json.DefaultJsonProtocol
-import stats.ScriptPlayerEventsRecorder.NodeReached
+
+import io.circe.parser.decode
+import io.circe.generic.auto._
+
 import stats.models.User
 import stats.services.EventsDBService
 import stats.{NoSuchEvent, ScriptPlayerEvent, ScriptPlayerEventsRecorder}
 
 import scala.concurrent.ExecutionContext
 
-trait Protocols extends DefaultJsonProtocol {
-  implicit val nodeReachedFormat: RootJsonFormat[NodeReached] =
-    jsonFormat4(ScriptPlayerEventsRecorder.NodeReached.apply)
-}
-
 
 class WsService()(implicit val system: ActorSystem,
                   fm: ActorMaterializer,
                   eventsService: EventsDBService,
-                  ec: ExecutionContext) extends Protocols {
+                  ec: ExecutionContext) {
 
   def createProcessor(user: User, scriptId: Long): Flow[Message, Message, NotUsed] = {
     val collectingActor = system.actorOf(ScriptPlayerEventsRecorder.props(user, scriptId))
@@ -32,7 +28,7 @@ class WsService()(implicit val system: ActorSystem,
     val incomingMessages: Sink[Message, NotUsed] =
       Flow[Message].map {
         // transform websocket message to domain message
-        case TextMessage.Strict(text) => text.parseJson.convertTo[ScriptPlayerEventsRecorder.NodeReached]
+        case TextMessage.Strict(text) => decode[ScriptPlayerEventsRecorder.NodeReached](text) getOrElse NoSuchEvent
         case _ => NoSuchEvent
       }.to(Sink.actorRef[ScriptPlayerEvent](collectingActor, PoisonPill))
 

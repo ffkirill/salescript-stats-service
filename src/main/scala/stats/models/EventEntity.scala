@@ -6,7 +6,7 @@ import java.util.UUID
 case class EventEntity(id: Option[Long] = None,
                        userId: Long,
                        scriptId: Long,
-                       fromNodeId: UUID,
+                       fromNodeId: Option[UUID] = None,
                        toNodeId: Option[UUID] = None,
                        reachedGoalId: Option[Long] = None,
                        textFrom: Option[String] = None,

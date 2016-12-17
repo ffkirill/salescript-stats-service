@@ -1,7 +1,6 @@
 package stats.services
 
 import slick.dbio.Effect.Write
-import slick.profile.FixedSqlAction
 import stats.models.db.EventEntityTable
 import stats.models.EventEntity
 import stats.utils.DatabaseService
@@ -15,10 +14,13 @@ class EventsDBService(val databaseService: DatabaseService)
   import databaseService._
   import databaseService.driver.api._
 
-  def getEvents: Future[Seq[EventEntity]] = db.run(events.result)
+  def get: Future[Seq[EventEntity]] = db.run(events.result)
+
+  def getByScriptId(id: Long): Future[Seq[EventEntity]] =
+    db.run(events.filter(_.scriptId === id).result)
 
   def createEvent(event: EventEntity): Future[Try[EventEntity]] = {
-    val query: FixedSqlAction[EventEntity, NoStream, Write] = (events returning events) += event
+    val query = (events returning events) += event
     db.run(query.asTry)
   }
 

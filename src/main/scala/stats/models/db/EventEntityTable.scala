@@ -16,7 +16,7 @@ trait EventEntityTable {
     def id: Rep[Option[Long]] = column[Option[Long]]("id", O.PrimaryKey, O.AutoInc)
     def userId: Rep[Long] = column[Long]("user_id")
     def scriptId: Rep[Long] = column[Long]("script_id")
-    def fromNodeId: Rep[UUID] = column[UUID]("from_node")
+    def fromNodeId: Rep[Option[UUID]] = column[Option[UUID]]("from_node")
     def toNodeId: Rep[Option[UUID]] = column[Option[UUID]]("to_node")
     def reachedGoalId: Rep[Option[Long]] = column[Option[Long]]("reached_goal")
     def textFrom: Rep[Option[String]] = column[Option[String]]("text_from")
