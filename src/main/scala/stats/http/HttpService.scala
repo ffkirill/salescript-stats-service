@@ -25,6 +25,10 @@ class HttpService(eventsRecorderFlowFactory: HttpServiceTypes.EventsRecorderFlow
                   eventsService: EventsDBService)
   extends CirceSupport with Protocols with SecurityDirectives {
 
+  def checkUserRightsOnScript(user: User, id: Long): Boolean = {
+    user.isSuperuser || user.ownScripts.keys.toSet.contains(id)
+  }
+
   val route: Route =
     authenticate { user =>
       get {
@@ -32,9 +36,16 @@ class HttpService(eventsRecorderFlowFactory: HttpServiceTypes.EventsRecorderFlow
           parameter("scriptId".as[Long]) {
             scriptId => handleWebSocketMessages(eventsRecorderFlowFactory(user, scriptId)) }
         } ~
-        pathPrefix("stats-v1-query" / IntNumber) { id =>
+        pathPrefix("stats-v1-query") {
+          pathPrefix(LongNumber) { id =>
+            authorize(checkUserRightsOnScript(user, id)) {
+              path("summary") {
+                complete(eventsService.getScriptSummary(Seq(id)).map(_.asJson))
+              }
+            }
+          } ~
           path("summary") {
-            complete(eventsService.getByScriptId(id).map(_.asJson))
+            complete(eventsService.getScriptSummary(user.ownScripts.keys.toSeq).map(_.asJson))
           }
         }
       }
