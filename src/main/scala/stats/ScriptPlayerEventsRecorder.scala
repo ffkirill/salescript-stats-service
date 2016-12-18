@@ -19,7 +19,7 @@ object ScriptPlayerEventsRecorder {
 
   val success = "__success__"
   val fail = "__fail__"
-  val noSuchReply = "_no_such_event"
+  val noSuchReply = "_no_such_reply"
   val entry = "__entry__"
 
   def props(user: User, scriptId: Long)
