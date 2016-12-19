@@ -16,6 +16,7 @@ libraryDependencies ++= Seq(
 
   "com.typesafe.slick" %% "slick" % "3.2.0-M2",
   "org.postgresql" % "postgresql" % "9.4-1201-jdbc41",
+  "com.github.tminglei" %% "slick-pg" % "0.15.0-M3",
   "org.flywaydb" % "flyway-core" % "3.2.1",
 
   "io.circe" %% "circe-core" % circeVersion,

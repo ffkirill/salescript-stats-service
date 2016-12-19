@@ -1,5 +1,8 @@
 package stats.services
 
+import java.sql.Timestamp
+import java.time.LocalDateTime
+
 import stats.models.db.EventEntityTable
 import stats.models.{EventEntity, ScriptGoals}
 import stats.utils.DatabaseService
@@ -7,7 +10,10 @@ import stats.utils.DatabaseService
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
+
 case class ScriptSummaryEntry(scriptId: Long,
+                              userId: Option[Long],
+                              date: Option[Timestamp],
                               runCount: Int,
                               successCount: Int,
                               failCount: Int,
@@ -25,29 +31,47 @@ class EventsDBService(val databaseService: DatabaseService)
   def getByScriptId(id: Long): Future[Seq[EventEntity]] =
     db.run(events.filter(_.scriptId === id).result)
 
-  def getScriptSummary(ids: Seq[Long]): Future[Seq[ScriptSummaryEntry]] = {
+  def getScriptSummary(ids: Option[Seq[Long]],
+                       startDate: Option[LocalDateTime] = None,
+                       endDate: Option[LocalDateTime] = None,
+                       groupByUser: Boolean = false,
+                       groupByDate: Option[DateTruncKind] = None): Future[Seq[ScriptSummaryEntry]] = {
+
+    def aggGoalReachCount(query: Query[Events, EventEntity, Seq],
+                          goal: ScriptGoals.Value) = query.map(p =>
+      Case If (p.reachedGoalId === goal.id.toLong) Then 1 Else 0).sum.getOrElse(0)
+
+    var sourceQuery: Query[Events, EventEntity, Seq] = events
+
+    ids.foreach(v => sourceQuery = sourceQuery.filter(_.scriptId inSetBind v))
+    startDate.foreach(v => sourceQuery = sourceQuery.filter(_.timestamp >= Timestamp.valueOf(v)))
+    endDate.foreach(v => sourceQuery = sourceQuery.filter(_.timestamp <= Timestamp.valueOf(v)))
+
+    def grouper(q: Events): (Rep[Long], Rep[Option[Long]], Rep[Option[Timestamp]]) = (
+      q.scriptId,
+      if (groupByUser) q.userId.? else None,
+      groupByDate.map(v => q.timestamp.? trunc v.toString).getOrElse(None)
+    )
+
     val query = for {
-      (scriptId, nestedData) <- events.filter(_.scriptId inSetBind ids)
-        .groupBy(_.scriptId)
+      (group, nestedData) <- sourceQuery
+        .groupBy(grouper)
     } yield {
-
-      def aggGoalReachCount(query: nestedData.type , goal: ScriptGoals.Value) = query.map(p =>
-        Case If (p.reachedGoalId === goal.id.toLong) Then 1 Else 0).sum.getOrElse(0)
-
       (
-        scriptId,
+        group._1,
+        group._2,
+        group._3,
         aggGoalReachCount(nestedData, ScriptGoals.scriptRan),
         aggGoalReachCount(nestedData, ScriptGoals.success),
         aggGoalReachCount(nestedData, ScriptGoals.failure),
         aggGoalReachCount(nestedData, ScriptGoals.noSuchReply),
         nestedData.length
-      )
+      ) <> ((ScriptSummaryEntry.apply _).tupled, ScriptSummaryEntry.unapply)
 
     }
-    query.result.statements.foreach(println)
-    val action = query.result.map(seq =>
-      seq.map(row => (ScriptSummaryEntry.apply _).tupled(row))
-    )
+
+    val action = query.result
+    action.statements.foreach(println)
     db.run(action)
   }
 
