@@ -11,6 +11,7 @@ scalacOptions ++= Seq("-deprecation", "-feature", "-unchecked")
 val circeVersion = "0.6.1"
 
 libraryDependencies ++= Seq(
+  "com.chuusai" %% "shapeless" % "2.3.2",
   "com.typesafe.akka" %% "akka-http" % "10.0.0",
   "de.heikoseeberger" %% "akka-http-circe" % "1.11.0",
 

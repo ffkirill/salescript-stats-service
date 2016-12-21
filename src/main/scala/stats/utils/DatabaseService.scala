@@ -19,7 +19,6 @@ trait DateTruncateEnumExtension {
 
 trait PostgresProfileWithExtensions extends slick.jdbc.PostgresProfile
   with PgDateSupport {
-
   override val api = MyAPI
 
   object MyAPI extends API
@@ -30,13 +29,19 @@ trait PostgresProfileWithExtensions extends slick.jdbc.PostgresProfile
 
 object PostgresProfileWithExtensions extends PostgresProfileWithExtensions
 
-class DatabaseService(jdbcUrl: String, dbUser: String, dbPassword: String) extends {
+class DatabaseService(jdbcUrl: String,
+                      dbUser: String,
+                      dbPassword: String,
+                      scriptsSchemaName: String) extends {
+
   private val hikariConfig = new HikariConfig()
   hikariConfig.setJdbcUrl(jdbcUrl)
   hikariConfig.setUsername(dbUser)
   hikariConfig.setPassword(dbPassword)
 
   private val dataSource = new HikariDataSource(hikariConfig)
+
+  def scriptsSchema: String = scriptsSchemaName
 
   val driver = PostgresProfileWithExtensions
   import driver.api._
@@ -45,6 +50,6 @@ class DatabaseService(jdbcUrl: String, dbUser: String, dbPassword: String) exten
 }
 
 object DatabaseService {
-  def apply(jdbcUrl: String, dbUser: String, dbPassword: String): DatabaseService =
-    new DatabaseService(jdbcUrl, dbUser, dbPassword)
+  def apply(jdbcUrl: String, dbUser: String, dbPassword: String, scriptsSchemaName: String): DatabaseService =
+    new DatabaseService(jdbcUrl, dbUser, dbPassword, scriptsSchemaName)
 }

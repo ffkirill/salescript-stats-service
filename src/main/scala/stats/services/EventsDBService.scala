@@ -3,6 +3,7 @@ package stats.services
 import java.sql.Timestamp
 import java.time.LocalDateTime
 
+import shapeless.syntax.std.tuple._
 import stats.models.db.EventEntityTable
 import stats.models.{EventEntity, ScriptGoals}
 import stats.utils.DatabaseService
@@ -18,10 +19,17 @@ case class ScriptSummaryEntry(scriptId: Long,
                               successCount: Int,
                               failCount: Int,
                               noSuchReplyCount: Int,
-                              allEventsCount: Int)
+                              allEventsCount: Int,
+                              scriptTitle: Option[String],
+                              userName: Option[String],
+                              userFirstName: Option[String],
+                              userLastName: Option[String]
+                             )
 
 class EventsDBService(val databaseService: DatabaseService)
-                     (implicit executionContext: ExecutionContext) extends EventEntityTable {
+                     (implicit executionContext: ExecutionContext,
+                      scriptsService: ScriptsDBService,
+                      usersService: UsersDBService) extends EventEntityTable {
 
   import databaseService._
   import databaseService.driver.api._
@@ -35,17 +43,17 @@ class EventsDBService(val databaseService: DatabaseService)
                        startDate: Option[LocalDateTime] = None,
                        endDate: Option[LocalDateTime] = None,
                        groupByUser: Boolean = false,
-                       groupByDate: Option[DateTruncKind] = None): Future[Seq[ScriptSummaryEntry]] = {
+                       groupByDate: Option[DateTruncKind] = None) = {
 
     def aggGoalReachCount(query: Query[Events, EventEntity, Seq],
                           goal: ScriptGoals.Value) = query.map(p =>
       Case If (p.reachedGoalId === goal.id.toLong) Then 1 Else 0).sum.getOrElse(0)
 
-    var sourceQuery: Query[Events, EventEntity, Seq] = events
+    var filteredQuery: Query[Events, EventEntity, Seq] = events
 
-    ids.foreach(v => sourceQuery = sourceQuery.filter(_.scriptId inSetBind v))
-    startDate.foreach(v => sourceQuery = sourceQuery.filter(_.timestamp >= Timestamp.valueOf(v)))
-    endDate.foreach(v => sourceQuery = sourceQuery.filter(_.timestamp <= Timestamp.valueOf(v)))
+    ids.foreach(v => filteredQuery = filteredQuery.filter(_.scriptId inSetBind v))
+    startDate.foreach(v => filteredQuery = filteredQuery.filter(_.timestamp >= Timestamp.valueOf(v)))
+    endDate.foreach(v => filteredQuery = filteredQuery.filter(_.timestamp <= Timestamp.valueOf(v)))
 
     def grouper(q: Events): (Rep[Long], Rep[Option[Long]], Rep[Option[Timestamp]]) = (
       q.scriptId,
@@ -53,24 +61,57 @@ class EventsDBService(val databaseService: DatabaseService)
       groupByDate.map(v => q.timestamp.? trunc v.toString).getOrElse(None)
     )
 
-    val query = for {
-      (group, nestedData) <- sourceQuery
+    val groupedQuery = for {
+      (group, nestedData) <- filteredQuery
         .groupBy(grouper)
     } yield {
-      (
-        group._1,
-        group._2,
-        group._3,
-        aggGoalReachCount(nestedData, ScriptGoals.scriptRan),
-        aggGoalReachCount(nestedData, ScriptGoals.success),
-        aggGoalReachCount(nestedData, ScriptGoals.failure),
-        aggGoalReachCount(nestedData, ScriptGoals.noSuchReply),
-        nestedData.length
-      ) <> ((ScriptSummaryEntry.apply _).tupled, ScriptSummaryEntry.unapply)
-
+      (group,
+        (aggGoalReachCount(nestedData, ScriptGoals.scriptRan),
+          aggGoalReachCount(nestedData, ScriptGoals.success),
+          aggGoalReachCount(nestedData, ScriptGoals.failure),
+          aggGoalReachCount(nestedData, ScriptGoals.noSuchReply),
+          nestedData.length)
+      )
     }
 
-    val action = query.result
+    val joinScripts = for {
+      (eventsSummary, scriptsQuery) <- groupedQuery.joinLeft(scriptsService.scripts).on{
+        case (((scriptId, _, _), _), scriptsQuery) => {
+          scriptId === scriptsQuery.id
+        }
+      }
+    } yield {
+      (eventsSummary :+ scriptsQuery.map(_.title))
+    }
+
+    val query = if (groupByUser) {
+      for {
+        (eventsSummary, usersQuery) <- joinScripts.joinLeft(usersService.users).on{
+          case (((_, userId, _), _, _), usersQuery) => {
+            userId === usersQuery.id
+          }
+        }
+      } yield {
+        (eventsSummary :+ (
+          usersQuery.map(_.username), usersQuery.map(_.firstName), usersQuery.map(_.lastName)))
+      }
+    } else {
+      for {
+        eventsSummary <- joinScripts
+      } yield {
+        (eventsSummary :+ (Option.empty[String], Option.empty[String], Option.empty[String]))
+      }
+    }
+
+    val queryProjection = for {
+      eventsSummary <- query
+    } yield {
+      (eventsSummary match {
+        case (group, stats, scriptName, user) => (group ++ stats :+ scriptName) ++ user
+      }) <> ((ScriptSummaryEntry.apply _).tupled, ScriptSummaryEntry.unapply)
+    }
+
+    val action = queryProjection.result
     action.statements.foreach(println)
     db.run(action)
   }
@@ -84,6 +125,8 @@ class EventsDBService(val databaseService: DatabaseService)
 
 object EventsDBService {
   def apply(databaseService: DatabaseService)
-           (implicit executionContext: ExecutionContext): EventsDBService =
-    new EventsDBService(databaseService)(executionContext)
+           (implicit executionContext: ExecutionContext,
+            scriptsService: ScriptsDBService,
+            usersService: UsersDBService): EventsDBService =
+    new EventsDBService(databaseService)(executionContext, scriptsService, usersService)
 }
