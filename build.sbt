@@ -31,3 +31,4 @@ libraryDependencies ++= Seq(
 )
 enablePlugins(JavaAppPackaging)
 enablePlugins(DockerPlugin)
+dockerRepository := Some("salescript")
